@@ -1,47 +1,64 @@
-name: Corretto CI
-on:
-  schedule:
-    - cron: "0 1 * * 1-5" # Mon-Fri at 1am UTC
-  workflow_dispatch:
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    steps:
+    - continue-on-error: true
+      name: Free disk space
+      run: 'sudo rm -rf "/usr/local/share/boost"
+
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+        sudo apt-get clean
+
+        df -h
+
+        '
+    - continue-on-error: true
+      uses: actions/checkout@v3
+    - continue-on-error: true
+      name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: corretto
+        java-version: ${{ matrix.java }}
+    - continue-on-error: true
+      name: Setup Gradle
+      uses: gradle/gradle-build-action@v2.12.0
+    - continue-on-error: true
+      env:
+        GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+        GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD
+          }}
+        GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME
+          }}
+      name: Optional setup step
+      run: '[ -f ./setup.sh ] && ./setup.sh || true
+
+        '
+    - continue-on-error: true
+      env:
+        GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY
+          }}
+        GH_USERNAME: ${{ secrets.GH_USERNAME }}
+        GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+        GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD
+          }}
+        GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME
+          }}
+        MICRONAUT_TEST_USE_VENDOR: true
+        PREDICTIVE_TEST_SELECTION: ${{ github.event_name == 'pull_request' && 'true'
+          || 'false' }}
+        TESTCONTAINERS_RYUK_DISABLED: true
+      id: gradle
+      name: Build with Gradle
+      run: './gradlew check --no-daemon --parallel --continue
+
+        '
     strategy:
       matrix:
-        java: ['17']
-    steps:
-      # https://github.com/actions/virtual-environments/issues/709
-      - name: Free disk space
-        run: |
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          df -h
-      - uses: actions/checkout@v3
-      - name: Set up JDK
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'corretto'
-          java-version: ${{ matrix.java }}
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2.12.0
-      - name: Optional setup step
-        env:
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-        run: |
-          [ -f ./setup.sh ] && ./setup.sh || true
-      - name: Build with Gradle
-        id: gradle
-        run: |
-          ./gradlew check --no-daemon --parallel --continue
-        env:
-          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
-          GH_USERNAME: ${{ secrets.GH_USERNAME }}
-          MICRONAUT_TEST_USE_VENDOR: true
-          TESTCONTAINERS_RYUK_DISABLED: true
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-          PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
+        java:
+        - '17'
+name: Corretto CI
+on:
+  repository_dispatch:
+    types: trigger-ga___corretto.yml
